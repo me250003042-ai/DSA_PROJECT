@@ -1,9 +1,6 @@
 ---
 title: "D6: Cost models for the running median (Structure A and Structure B)"
-author: "Analyst: [WRITE YOUR NAME AND ROLL NUMBER HERE]"
-date: "Written and frozen before any measurement: 14 November 2026, 04:37 UTC"
-geometry: margin=2.2cm
-fontsize: 11pt
+author: "Analyst: Om"
 ---
 
 **Status.** This document and `results/predictions.csv` were written *before* any benchmark was run.
