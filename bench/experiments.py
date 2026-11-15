@@ -3,7 +3,7 @@
 # so the prediction and the measurement always describe the same runs.
 
 N = 1000000            # readings per run
-RUNS = 5               # repeated runs per setting, seeds 1..5
+RUNS = 5               # repeated runs per setting, seeds 1....5
 SEEDS = [1, 2, 3, 4, 5]
 
 # each setting: name, structure, w, retract percent, value range R, percentile, purge factor
