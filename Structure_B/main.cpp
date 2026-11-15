@@ -11,7 +11,7 @@ public:
     int n;
     vector<ll> bit;
 
-    void update(int i,ll x){
+    void add(int i,ll x){
         while(i<=n){
             bit[i] += x;
             i += (i & (-i));
@@ -41,7 +41,7 @@ int main(){
 
     for(int i = 1;i<=n;i++){
         cin>>a[i];
-        if((a[i] > 1e5 || a[i] != (ll)a[i]) || a[i] < 0){
+        if((a[i] > 1e5 || a[i] != (ll)a[i]) || a[i] <= 0){
             compression_required = true;
         }
     }
@@ -49,28 +49,27 @@ int main(){
     if(compression_required){
         vector<double> b = a;
         sort(b.begin() + 1,b.end());
-
-        FenTree ft = FenTree(n);
+        b.erase(unique(b.begin(), b.end()), b.end());
+        FenTree ft = FenTree(b.size());
 
         for(int i = 1;i<=win_size;i++){
             int idx = lower_bound(b.begin() + 1,b.end(), a[i]) - b.begin();
-            ft.update(idx,1);
+            ft.add(idx,1);
         }
 
         for(int z = 1;z <= n-win_size+1;z++){
             if(z > 1){
                 int left = lower_bound(b.begin() + 1,b.end(), a[z-1]) - b.begin();
                 int right = lower_bound(b.begin() + 1,b.end(), a[z-1+win_size]) - b.begin();
-                ft.update(left,-1);
-                ft.update(right, 1);
+                ft.add(left,-1);
+                ft.add(right, 1);
             }
             // code of binary lifting for finding median of each window
-
             int i = log2(n);
             int j = 0;
             int sum = 0;
             int target = win_size - win_size/2; // this i have set for lower median
-
+            int ans = j;
             while(i>=0){
                 j += (1<<i);
                 if(j > n){
@@ -81,39 +80,42 @@ int main(){
                 sum += ft.bit[j];
                 // cout<<i<<' '<<j<<' '<<sum<<endl;
 
-                if(sum > target){
+                if(sum >= target){
+                    ans = j;
                     sum -= (ft.bit[j]);
                     j -= (1<<i);
                 }
-                
-                if(sum == target)break;
                 i--;
             }
-            cout<<b[j]<<endl;
+            if(sum < target){
+                cout<<b[ans]<<endl;
+            }else{
+                cout<<b[j]<<endl;
+            }
         }
 
     }else{
-        FenTree ft = FenTree(n);
+        FenTree ft = FenTree(*max_element(a.begin()+1,a.end()));
 
         for(int i = 1;i<=win_size;i++){
-            ft.update(a[i],1);
+            ft.add(a[i],1);
         }
 
         for(int z = 1;z <= n-win_size+1;z++){
             if(z > 1){
-                ft.update(a[z-1],-1);
-                ft.update(a[z-1-win_size], 1);
+                ft.add(a[z-1],-1);
+                ft.add(a[z-1+win_size], 1);
             }
             // code of binary lifting for finding median of each window
-
-            int i = log2(n);
+            int i = log2(ft.n);
             int j = 0;
             int sum = 0;
             int target = win_size - win_size/2; // this i have set for lower median
+            int ans = 0;
 
             while(i>=0){
                 j += (1<<i);
-                if(j > n){
+                if(j > ft.n){
                     j -= (1<<i);
                     i--;
                     continue;
@@ -121,17 +123,19 @@ int main(){
                 sum += ft.bit[j];
                 // cout<<i<<' '<<j<<' '<<sum<<endl;
 
-                if(sum > target){
+                if(sum >= target){
+                    ans = j;
                     sum -= (ft.bit[j]);
                     j -= (1<<i);
                 }
-                
-                if(sum == target)break;
                 i--;
             }
-            cout<<a[j]<<endl;
+            if(sum < target){
+                cout<<ans<<endl;
+            }else{
+                cout<<j<<endl;
+            }
         }
-
     }
     return 0;
 }
