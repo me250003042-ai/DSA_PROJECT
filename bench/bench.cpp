@@ -1,35 +1,28 @@
-// bench.cpp  (owner: Analyst)
-// Runs ONE experiment setting on ONE structure and prints one CSV line.
-//
-// Usage: ./bench STRUCT W RETRACT_PCT RANGE N PERCENTILE SEED PURGE_FACTOR
-//   STRUCT = A or B,  W = window,  RETRACT_PCT = chance (0..100) of one retraction per step
-//   RANGE  = readings are random in [0, RANGE),  N = number of readings
-//
-// One step = add a reading, maybe retract an earlier one, then ask for the percentile.
-// Compile with -DCOUNT_OPS to also print the operation counters (slower, so not used for timing).
-
 #include <iostream>
-#include <fstream>
+#include <windows.h>
+#include <psapi.h>
 #include <string>
 #include <vector>
 #include <random>
-#include <chrono>
 #include <cstdlib>
 #include <cmath>
 #include "../src/structA/medianA.h"
 #include "../src/structB/medianB.h"
 using namespace std;
 
-// read a number such as "VmRSS:  1234 kB" from /proc/self/status (Linux)
-long readStatusKb(string key) {
-    ifstream f("/proc/self/status");
-    string line;
-    while (getline(f, line)) {
-        if (line.compare(0, key.size(), key) == 0) {
-            return atol(line.c_str() + key.size());
-        }
+double memoryKb(bool peak) {
+    PROCESS_MEMORY_COUNTERS info = {};
+    if (!GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info))) {
+        cerr << "Cannot read process memory: " << GetLastError() << "\n";
+        exit(1);
     }
-    return 0;
+    return (peak ? info.PeakWorkingSetSize : info.WorkingSetSize) / 1024.0;
+}
+
+LONGLONG ticks() {
+    LARGE_INTEGER value;
+    QueryPerformanceCounter(&value);
+    return value.QuadPart;
 }
 
 int main(int argc, char **argv) {
@@ -37,6 +30,7 @@ int main(int argc, char **argv) {
         cout << "usage: ./bench STRUCT W RETRACT_PCT RANGE N PERCENTILE SEED PURGE_FACTOR\n";
         return 1;
     }
+
     string which = argv[1];
     int w = atoi(argv[2]);
     int retractPct = atoi(argv[3]);
@@ -45,17 +39,22 @@ int main(int argc, char **argv) {
     int percentile = atoi(argv[6]);
     unsigned seed = (unsigned)atoi(argv[7]);
     double purgeFactor = atof(argv[8]);
+    if ((which != "A" && which != "B") || w <= 0 || range <= 0 || n <= 0 ||
+        retractPct < 0 || retractPct > 100 || percentile < 1 || percentile > 100 ||
+        !isfinite(purgeFactor) || purgeFactor <= 1) {
+        cerr << "Invalid setting: use A/B, positive sizes, retract 0..100, percentile 1..100, purge factor > 1.\n";
+        return 1;
+    }
 
-    // ---- make the input (not timed) ----
     mt19937 rng(seed);
     vector<int> values(n);
-    vector<int> retractId(n);          // 0 = no retraction in this step
+    vector<int> retractId(n);
     for (int i = 0; i < n; i++) {
         values[i] = (int)(rng() % range);
         retractId[i] = 0;
         if ((int)(rng() % 100) < retractPct) {
-            int back = (int)(rng() % w);           // one of the last w readings
-            int id = (i + 1) - back;               // reading i has id i+1
+            int back = (int)(rng() % w);
+            int id = (i + 1) - back;
             if (id < 1) {
                 id = 1;
             }
@@ -63,10 +62,12 @@ int main(int argc, char **argv) {
         }
     }
 
-    long baseKb = readStatusKb("VmRSS:");
+    double baseKb = memoryKb(false);
+    LARGE_INTEGER frequency;
+    QueryPerformanceFrequency(&frequency);
 
-    // ---- build ----
-    auto t0 = chrono::steady_clock::now();
+    LONGLONG t0 = ticks();
+
     StructureA *a = 0;
     StructureB *b = 0;
     if (which == "A") {
@@ -75,9 +76,8 @@ int main(int argc, char **argv) {
     } else {
         b = new StructureB(w, percentile, values);
     }
-    auto t1 = chrono::steady_clock::now();
+    LONGLONG t1 = ticks();
 
-    // ---- replay (timed) ----
     double checksum = 0;
     long retractDone = 0;
     for (int i = 0; i < n; i++) {
@@ -88,7 +88,8 @@ int main(int argc, char **argv) {
                     retractDone++;
                 }
             }
-            checksum += a->get();
+            double answer = a->get();
+            if (!isnan(answer)) checksum += answer;
         } else {
             b->add(values[i]);
             if (retractId[i] > 0) {
@@ -96,14 +97,16 @@ int main(int argc, char **argv) {
                     retractDone++;
                 }
             }
-            checksum += b->get();
+            double answer = b->get();
+            if (!isnan(answer)) checksum += answer;
         }
     }
-    auto t2 = chrono::steady_clock::now();
+    LONGLONG t2 = ticks();
 
-    long peakKb = readStatusKb("VmHWM:");
-    double buildMs = chrono::duration<double, milli>(t1 - t0).count();
-    double runMs = chrono::duration<double, milli>(t2 - t1).count();
+    double peakKb = memoryKb(true);
+
+    double buildMs = (t1 - t0) * 1000.0 / frequency.QuadPart;
+    double runMs = (t2 - t1) * 1000.0 / frequency.QuadPart;
 
     cout.precision(12);
     cout << which << "," << w << "," << retractPct << "," << range << "," << n << ","
@@ -116,5 +119,7 @@ int main(int argc, char **argv) {
          << "," << g_fen_steps / (double)n << "," << g_bin_steps / (double)n;
 #endif
     cout << "\n";
+    delete a;
+    delete b;
     return 0;
 }
