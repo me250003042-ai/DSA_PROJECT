@@ -1,0 +1,2 @@
+experiment,structure,w,retract_pct,range,N,percentile,seed,purge_factor,build_ms,run_ms,ns_per_step,peak_kb,checksum,retractions_done
+exp1_window,A,100,10,1000000,1000000,50,1,2,0.0081,604.5429,604.5429,6024,499019293316,95222
