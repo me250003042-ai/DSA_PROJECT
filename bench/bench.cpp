@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <cmath>
 #include "../src/structA/medianA.h"
-#include "../src/structB/medianB.h"
+#include "../Structure_B/structureB.h"
 using namespace std;
 
 double memoryKb(bool peak) {
