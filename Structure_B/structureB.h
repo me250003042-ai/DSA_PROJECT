@@ -37,30 +37,40 @@ public:
 
 class StructureB{
     int win_size;
-    int n;
-    vector<double> all, arr;
+    int p;
+    vector<double> all;
+    vector<pair<double,bool>> arr;
     int start = 0;
     FenTree ft;
+    int size = 0;
     
 public:
-    StructureB (int w, int n, vector<double> all){
+    StructureB (int w, int n, vector<double> a){
+        if(w == 0){
+            throw invalid_argument("Window of size zero is not allowed.");
+        }
         this->win_size = w;
-        this->n = n;
-        this->all = all;
+        this->p = n;
+        this->all = a;
         sort(all.begin(),all.end());
         ft = FenTree(all.size());
     }
 
     void add(double x){
-        arr.push_back(x);
-        if(arr.size() - start > win_size){
-            int left = 1 + lower_bound(all.begin(),all.end(),arr[start]) - all.begin();
-            int right = 1 + lower_bound(all.begin(),all.end(),arr.back()) - all.begin();
+        size++;
+        arr.push_back({x,true});
+        if(size > win_size){
+            int left = 1 + lower_bound(all.begin(),all.end(),arr[start].first) - all.begin();
+            int right = 1 + lower_bound(all.begin(),all.end(),arr.back().first) - all.begin();
             ft.add(left , -1);
             ft.add(right , 1);
             start++;
+            while(!arr[start].second){
+                start++;
+            }
+            size--;
         }else{
-            int idx = 1 + lower_bound(all.begin(),all.end(),arr.back()) - all.begin();
+            int idx = 1 + lower_bound(all.begin(),all.end(),arr.back().first) - all.begin();
             ft.add(idx , 1);
         }
     }
@@ -68,15 +78,28 @@ public:
     void retract(double x){
         int idx = 1 + lower_bound(all.begin(),all.end(),x) - all.begin();
         int val = ft.sum(idx) - (idx > 1 ? ft.sum(idx - 1) : 0);
-        ft.add(left , -val);
+        for(int i = start;i<arr.size();i++){
+            if(arr[i].first == x){
+                arr[i].second = false;
+            }
+        }
+        size -= val;
+        while(!arr[start].second && start < arr.size()-1){
+            start++;
+        }
+        ft.add(idx , -val);
     }
 
-    void get(){
-        int i = log2(n);
+    double get(){
+        if(size == 0){
+            throw invalid_argument("No elements present");
+        }
+        
+        // median is found out using binary lifting
+        int i = log2(ft.n);
         int j = 0;
         int sum = 0;
-        int w = arr.size() - start;
-        int target = w - w/2; // this i have set for lower median
+        int target = size - size/2; // this i have set for lower median
         int ans = j;
         while(i>=0){
             j += (1<<i);
@@ -86,7 +109,6 @@ public:
                 continue;
             }
             sum += ft.bit[j];
-            // cout<<i<<' '<<j<<' '<<sum<<endl;
 
             if(sum >= target){
                 ans = j;
@@ -96,9 +118,8 @@ public:
             i--;
         }
         if(sum < target){
-            cout<<all[ans-1]<<endl;
-        }else{
-            cout<<all[j-1]<<endl;
+            return all[ans-1];
         }
+        return all[j-1];
     }
 };
