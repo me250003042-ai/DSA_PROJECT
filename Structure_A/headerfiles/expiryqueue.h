@@ -1,5 +1,6 @@
 
 #pragma once
+
 #include <vector>
 #include <stdexcept>
 
@@ -13,10 +14,14 @@ private:
 
 public:
     ExpiryQueue(int size) {
+        if (size <= 0)
+            throw std::invalid_argument("Invalid queue capacity");
+
         capacity = size;
         front = 0;
         rear = 0;
         count = 0;
+
         data.resize(capacity);
     }
 
