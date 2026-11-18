@@ -6,7 +6,6 @@
 #include "MinHeap.h"
 #include "HashTable.h"
 #include "ExpiryQueue.h"
-#include "Counters.h"
 
 #include <stdexcept>
 #include <vector>
@@ -19,7 +18,6 @@ private:
     HashTable table;
     ExpiryQueue windowQueue;
 
-    int windowSize;
     int lowLive;
     int highLive;
     int deadItems;
@@ -151,10 +149,7 @@ private:
         std::vector<Item> keepLow;
         std::vector<Item> keepHigh;
 
-        // Scan the LOW heap.
         for (const Item& x : low.items()) {
-            COUNT(g_purge_moves);
-
             HashEntry* entry = table.find(x.id);
 
             if (entry != nullptr && entry->active) {
@@ -164,10 +159,7 @@ private:
             }
         }
 
-        // Scan the HIGH heap.
         for (const Item& x : high.items()) {
-            COUNT(g_purge_moves);
-
             HashEntry* entry = table.find(x.id);
 
             if (entry != nullptr && entry->active) {
@@ -177,7 +169,6 @@ private:
             }
         }
 
-        // Rebuild both heaps using only active items.
         low.build(keepLow);
         high.build(keepHigh);
 
@@ -201,8 +192,6 @@ public:
         if (w <= 0)
             throw std::invalid_argument("Invalid window size");
 
-        windowSize = w;
-
         lowLive = 0;
         highLive = 0;
         deadItems = 0;
@@ -212,7 +201,6 @@ public:
     }
 
     long long insert(double value) {
-        // Expire the oldest reading if the window is full.
         if (windowQueue.full()) {
             long long oldId = windowQueue.pop();
             markDead(oldId);
