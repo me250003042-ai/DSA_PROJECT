@@ -1,6 +1,7 @@
 
 #pragma once
 #include "Item.h"
+#include "Counters.h"
 #include <vector>
 #include <stdexcept>
 #include <utility>
@@ -10,6 +11,8 @@ private:
     std::vector<Item> data;
 
     bool smallerItem(const Item& a, const Item& b) const {
+        COUNT(g_heap_compares);
+
         if (a.value != b.value)
             return a.value < b.value;
 
@@ -23,6 +26,7 @@ private:
             if (!smallerItem(data[i], data[parent]))
                 break;
 
+            COUNT(g_heap_swaps);
             std::swap(data[i], data[parent]);
             i = parent;
         }
@@ -45,6 +49,7 @@ private:
             if (smallest == i)
                 break;
 
+            COUNT(g_heap_swaps);
             std::swap(data[i], data[smallest]);
             i = smallest;
         }
