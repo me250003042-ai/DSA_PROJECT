@@ -1,5 +1,7 @@
 
 #pragma once
+
+#include "Counters.h"
 #include <vector>
 
 struct HashEntry {
@@ -67,14 +69,12 @@ public:
             return false;
         }
 
-        HashEntry* existing = find(id);
-
-        if (existing != nullptr) {
-            existing->heapSide = heapSide;
-            existing->active = true;
-            return true;
+        // Do not allow an ID to be inserted twice.
+        if (find(id) != nullptr) {
+            return false;
         }
 
+        // Grow when the used slots reach 70%.
         if ((used + 1) * 10 >= capacity * 7) {
             rehash(capacity * 2);
         }
@@ -83,6 +83,8 @@ public:
         int firstDeleted = -1;
 
         for (int probes = 0; probes < capacity; probes++) {
+            COUNT(g_hash_probes);
+
             if (!table[index].occupied) {
                 if (firstDeleted != -1) {
                     index = firstDeleted;
@@ -107,6 +109,7 @@ public:
             index = (index + 1) % capacity;
         }
 
+        // Use a tombstone if no empty slot was found.
         if (firstDeleted != -1) {
             index = firstDeleted;
 
@@ -120,6 +123,7 @@ public:
             return true;
         }
 
+        // No available slot: grow and retry.
         rehash(capacity * 2);
         return insert(id, heapSide);
     }
@@ -132,6 +136,8 @@ public:
         int index = hashFunction(id);
 
         for (int probes = 0; probes < capacity; probes++) {
+            COUNT(g_hash_probes);
+
             if (!table[index].occupied) {
                 return nullptr;
             }
@@ -158,8 +164,7 @@ public:
         return true;
     }
 
-    // Physical removal: call when the corresponding heap
-    // entry is actually discarded.
+    // Physical removal: call when the heap entry is discarded.
     bool remove(long long id) {
         HashEntry* entry = find(id);
 
