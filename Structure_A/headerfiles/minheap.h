@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <utility>
 
-class MinHeap {
+class MinHeap { 
 private:
     std::vector<Item> data;
 
