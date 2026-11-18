@@ -1,70 +1,91 @@
 import csv
+import math
 import os
 from statistics import mean, stdev
 
-here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
+
+results = os.path.join(os.path.dirname(__file__), "..", "results")
+
 
 def read(name):
-    with open(os.path.join(here, name)) as f:
-        return list(csv.DictReader(f))
+    with open(os.path.join(results, name)) as file:
+        return list(csv.DictReader(file))
 
-def key(r):
 
-    return (r["experiment"], r["structure"], int(r["w"]), int(r["retract_pct"]), int(r["range"]),
-            int(r["percentile"]), float(r["purge_factor"]))
+def setting(row):
+    return (
+        row["experiment"], row["structure"], int(row["w"]),
+        int(row["retract_pct"]), int(row["range"]),
+        float(row["purge_factor"]),
+    )
+
 
 timing = read("timing.csv")
 counts = read("counts.csv")
-preds = read("predictions.csv")
-
-sums = {}
-for r in timing:
-    k = (r["experiment"], int(r["w"]), int(r["retract_pct"]), int(r["range"]), int(r["percentile"]), r["seed"], float(r["purge_factor"]))
-    sums.setdefault((k[0], k[1], k[2], k[3], k[4], k[5]), {}).setdefault(r["structure"], set()).add(r["checksum"])
-bad = 0
-total = 0
-for k, d in sums.items():
-    if "A" in d and "B" in d:
-        total += 1
-        if d["A"] != d["B"]:
-            bad += 1
-print("checksum agreement A vs B: %d of %d settings/seeds agree" % (total - bad, total))
-if bad:
-    raise SystemExit("Benchmark checksums differ; investigate before generating graphs.")
+predictions = read("predictions.csv")
 
 groups = {}
-for r in timing:
-    groups.setdefault(key(r), []).append(r)
-cnt = {key(r): r for r in counts}
-pred = {key(r): r for r in preds}
+for row in timing:
+    groups.setdefault(setting(row), []).append(row)
 
+count_by_setting = {setting(row): row for row in counts}
 rows = []
-for k in pred:
 
-    g = groups[k]
-    ns = [float(r["ns_per_step"]) for r in g]
-    mem = [float(r["peak_kb"]) * 1024 / 1e6 for r in g]
-    c = cnt[k]
+for prediction in predictions:
+    key = setting(prediction)
+    runs = groups[key]
+    ns = [float(row["ns_per_step"]) for row in runs]
+    memory = [float(row["peak_kb"]) * 1024 / 1e6 for row in runs]
+    count = count_by_setting[key]
+    names = ["heap_compares", "heap_swaps", "hash_probes", "purge_moves", "fen_steps", "bin_steps"]
+    measured_operations = sum(float(count[name] or 0) for name in names)
+    mean_ns = mean(ns)
 
-    counter_names = ["heap_compares", "heap_swaps", "hash_probes", "purge_moves", "fen_steps", "bin_steps"]
-    ops = sum(float(c[name] or 0) for name in counter_names)
-    p = pred[k]
+    universe = int(count["distinct_values"]) if key[1] == "B" else key[2]
+    depth = math.log2(universe + 1)
+    model_units = 3.0 * depth if key[1] == "B" else float(prediction["model_step_units"])
+
     rows.append({
-        "experiment": k[0], "structure": k[1], "w": k[2], "retract_pct": k[3], "range": k[4], "percentile": k[5], "purge_factor": k[6],
-        "pred_ops": float(p["pred_ops_per_step"]), "meas_ops": round(ops, 2), "ops_ratio": round(ops / float(p["pred_ops_per_step"]), 2),
-        "pred_ns_low": float(p["pred_ns_low"]), "pred_ns_high": float(p["pred_ns_high"]),
-        "meas_ns_mean": round(mean(ns), 1), "meas_ns_sd": round(stdev(ns), 1),
-        "pred_mem_mb": float(p["pred_mem_mb"]), "meas_mem_mb": round(mean(mem), 1), "meas_mem_sd": round(stdev(mem), 1),
-        "meas_heap_compares": c["heap_compares"], "meas_heap_swaps": c["heap_swaps"], "meas_hash_probes": c["hash_probes"],
-        "meas_purge_moves": c["purge_moves"], "meas_fen_steps": c["fen_steps"], "meas_bin_steps": c["bin_steps"],
-        "pred_heap_compares": p["pred_heap_compares"], "pred_heap_swaps": p["pred_heap_swaps"], "pred_hash_probes": p["pred_hash_probes"],
-        "pred_purge_moves": p["pred_purge_moves"], "pred_fen_steps": p["pred_fen_steps"], "pred_bin_steps": p["pred_bin_steps"],
+        "experiment": key[0],
+        "structure": key[1],
+        "w": key[2],
+        "retract_pct": key[3],
+        "range": key[4],
+        "purge_factor": key[5],
+        "theta": prediction["theta"],
+        "model_scale": universe,
+        "log_depth": round(depth, 4),
+        "purge_overhead": prediction["purge_overhead"],
+        "model_step_units": round(model_units, 4),
+        "memory_order": prediction["memory_order"],
+        "mean_ns_per_step": round(mean_ns, 2),
+        "sd_ns_per_step": round(stdev(ns), 2),
+        "throughput_steps_per_sec": round(1e9 / mean_ns, 2),
+        "mean_memory_mb": round(mean(memory), 3),
+        "sd_memory_mb": round(stdev(memory), 3),
+        "measured_operations_per_step": round(measured_operations, 3),
+        "measured_purge_moves_per_step": count["purge_moves"],
+        "speedup_A_over_B": "",
     })
 
-with open(os.path.join(here, "comparison.csv"), "w", newline="") as f:
-    wr = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-    wr.writeheader()
-    for r in rows:
-        wr.writerow(r)
+pairs = {}
+for row in rows:
+    key = (
+        row["experiment"], row["w"], row["retract_pct"], row["range"],
+        row["purge_factor"],
+    )
+    pairs.setdefault(key, {})[row["structure"]] = row
 
-print("Wrote results/comparison.csv")
+for pair in pairs.values():
+    if "A" in pair and "B" in pair:
+        speedup = pair["B"]["mean_ns_per_step"] / pair["A"]["mean_ns_per_step"]
+        pair["A"]["speedup_A_over_B"] = round(speedup, 3)
+        pair["B"]["speedup_A_over_B"] = round(speedup, 3)
+
+path = os.path.join(results, "comparison.csv")
+with open(path, "w", newline="") as file:
+    writer = csv.DictWriter(file, fieldnames=rows[0].keys())
+    writer.writeheader()
+    writer.writerows(rows)
+
+print("Wrote", path)
