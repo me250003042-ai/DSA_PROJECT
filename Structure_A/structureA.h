@@ -6,6 +6,7 @@
 #include "MinHeap.h"
 #include "HashTable.h"
 #include "ExpiryQueue.h"
+#include "Counters.h"
 
 #include <stdexcept>
 #include <vector>
@@ -32,7 +33,7 @@ private:
         if (total == 0)
             return 0;
 
-        return (int)ceil(p * total);
+        return (int)std::ceil(p * total);
     }
 
     bool markDead(long long id) {
@@ -52,6 +53,7 @@ private:
             highLive--;
 
         deadItems++;
+
         return true;
     }
 
@@ -65,10 +67,11 @@ private:
 
             low.pop();
 
-            if (entry != nullptr) {
+            if (entry != nullptr)
                 table.remove(id);
+
+            if (deadItems > 0)
                 deadItems--;
-            }
         }
     }
 
@@ -82,10 +85,11 @@ private:
 
             high.pop();
 
-            if (entry != nullptr) {
+            if (entry != nullptr)
                 table.remove(id);
+
+            if (deadItems > 0)
                 deadItems--;
-            }
         }
     }
 
@@ -106,6 +110,7 @@ private:
             high.push(x);
 
             HashEntry* entry = table.find(x.id);
+
             if (entry != nullptr)
                 entry->heapSide = 1;
 
@@ -124,6 +129,7 @@ private:
             low.push(x);
 
             HashEntry* entry = table.find(x.id);
+
             if (entry != nullptr)
                 entry->heapSide = 0;
 
@@ -145,7 +151,10 @@ private:
         std::vector<Item> keepLow;
         std::vector<Item> keepHigh;
 
+        // Scan the LOW heap.
         for (const Item& x : low.items()) {
+            COUNT(g_purge_moves);
+
             HashEntry* entry = table.find(x.id);
 
             if (entry != nullptr && entry->active) {
@@ -155,7 +164,10 @@ private:
             }
         }
 
+        // Scan the HIGH heap.
         for (const Item& x : high.items()) {
+            COUNT(g_purge_moves);
+
             HashEntry* entry = table.find(x.id);
 
             if (entry != nullptr && entry->active) {
@@ -165,6 +177,7 @@ private:
             }
         }
 
+        // Rebuild both heaps using only active items.
         low.build(keepLow);
         high.build(keepHigh);
 
@@ -176,6 +189,7 @@ private:
         cleanHigh();
 
         rebalance(0.5);
+
         purgeIfNeeded();
 
         cleanLow();
@@ -198,6 +212,7 @@ public:
     }
 
     long long insert(double value) {
+        // Expire the oldest reading if the window is full.
         if (windowQueue.full()) {
             long long oldId = windowQueue.pop();
             markDead(oldId);
@@ -211,12 +226,16 @@ public:
         cleanHigh();
 
         if (low.empty() || value <= low.top().value) {
+            if (!table.insert(id, 0))
+                throw std::runtime_error("Hash table insertion failed");
+
             low.push(x);
-            table.insert(id, 0);
             lowLive++;
         } else {
+            if (!table.insert(id, 1))
+                throw std::runtime_error("Hash table insertion failed");
+
             high.push(x);
-            table.insert(id, 1);
             highLive++;
         }
 
@@ -254,7 +273,7 @@ public:
         if (size() == 0)
             throw std::runtime_error("No readings available");
 
-        if (p <= 0.0 || p > 1.0)
+        if (!(p > 0.0 && p <= 1.0))
             throw std::invalid_argument("Invalid percentile");
 
         rebalance(p);
@@ -263,10 +282,11 @@ public:
     }
 
     void setPurgeFactor(double factor) {
-        if (factor <= 0.0)
+        if (!(factor > 0.0))
             throw std::invalid_argument("Invalid purge factor");
 
         purgeFactor = factor;
+
         purgeIfNeeded();
     }
 
