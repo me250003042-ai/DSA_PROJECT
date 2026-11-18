@@ -1,132 +1,140 @@
-import csv, os
+import csv
+import os
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
-outdir = os.path.join(here, "figures")
-os.makedirs(outdir, exist_ok=True)
 
-rows = list(csv.DictReader(open(os.path.join(here, "comparison.csv"))))
-with open(os.path.join(here, "timing.csv")) as timing_file:
-    stream_size = int(next(csv.DictReader(timing_file))["N"])
-for r in rows:
-    for k in r:
+results = os.path.join(os.path.dirname(__file__), "..", "results")
+figures = os.path.join(results, "figures")
+os.makedirs(figures, exist_ok=True)
+
+for name in os.listdir(figures):
+    if name.endswith(".png"):
+        os.remove(os.path.join(figures, name))
+
+with open(os.path.join(results, "comparison.csv")) as file:
+    rows = list(csv.DictReader(file))
+
+for row in rows:
+    for key, value in list(row.items()):
         try:
-            r[k] = float(r[k])
-        except ValueError:
+            row[key] = float(value)
+        except (ValueError, TypeError):
             pass
 
-def pick(exp, st):
+colors = {"A": "tab:blue", "B": "tab:red"}
+labels = {"A": "A: two heaps", "B": "B: Fenwick tree"}
 
-    return [r for r in rows if r["experiment"] == exp and r["structure"] == st]
 
-COL = {"A": "tab:blue", "B": "tab:red"}
-NAME = {"A": "A: two heaps + lazy deletion", "B": "B: Fenwick tree"}
+def select(experiment, structure=None):
+    return [
+        row for row in rows
+        if row["experiment"] == experiment
+        and (structure is None or row["structure"] == structure)
+    ]
 
-def time_panel(ax, exp, xkey, xlabel, logx=True):
 
-    for st in ["A", "B"]:
-        d = pick(exp, st)
-        x = [r[xkey] for r in d]
-        y = [r["meas_ns_mean"] for r in d]
-        e = [r["meas_ns_sd"] for r in d]
-        lo = [r["pred_ns_low"] for r in d]
-        hi = [r["pred_ns_high"] for r in d]
-        ax.fill_between(x, lo, hi, color=COL[st], alpha=0.12, label="predicted band (%s)" % st)
-        ax.errorbar(x, y, yerr=e, color=COL[st], marker="o", capsize=3, label="measured " + NAME[st])
-    if logx:
-        ax.set_xscale("log")
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel("time per step (ns)")
-    ax.set_ylim(bottom=0)
-    ax.grid(alpha=0.3)
+def measured_graph(experiment, x_name, y_name, error_name, xlabel, ylabel, title, filename, log_x=False):
+    figure, axis = plt.subplots(figsize=(7, 4.5))
+    for structure in ["A", "B"]:
+        data = select(experiment, structure)
+        axis.errorbar(
+            [row[x_name] for row in data],
+            [row[y_name] for row in data],
+            yerr=[row[error_name] for row in data],
+            color=colors[structure], marker="o", capsize=4,
+            label=labels[structure],
+        )
+    if log_x:
+        axis.set_xscale("log")
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    axis.set_ylim(bottom=0)
+    axis.grid(alpha=0.3)
+    axis.legend()
+    axis.set_title(title)
+    figure.tight_layout()
+    figure.savefig(os.path.join(figures, filename), dpi=150)
+    plt.close(figure)
 
-def ops_panel(ax, exp, xkey, xlabel, logx=True):
 
-    for st in ["A", "B"]:
-        d = pick(exp, st)
-        x = [r[xkey] for r in d]
-        ax.plot(x, [r["pred_ops"] for r in d], color=COL[st], linestyle="--", marker="s", label="predicted " + st)
-        ax.plot(x, [r["meas_ops"] for r in d], color=COL[st], marker="o", label="measured " + st)
-    if logx:
-        ax.set_xscale("log")
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel("counted operations per step")
-    ax.set_ylim(bottom=0)
-    ax.grid(alpha=0.3)
+measured_graph(
+    "window", "w", "mean_ns_per_step", "sd_ns_per_step",
+    "window size w", "latency (ns per step)",
+    "Latency as window size grows", "fig1_latency_window.png", True,
+)
 
-def two_panel(exp, xkey, xlabel, title, fname, logx=True):
+measured_graph(
+    "window", "w", "mean_memory_mb", "sd_memory_mb",
+    "window size w", "extra peak resident memory (MB)",
+    "Memory as window size grows", "fig2_memory_window.png", True,
+)
 
-    fig, axs = plt.subplots(1, 2, figsize=(12, 4.2))
-    time_panel(axs[0], exp, xkey, xlabel, logx)
-    ops_panel(axs[1], exp, xkey, xlabel, logx)
-    axs[0].legend(fontsize=7)
-    axs[1].legend(fontsize=8)
-    fig.suptitle(title)
-    fig.tight_layout()
-    fig.savefig(os.path.join(outdir, fname), dpi=140)
-    plt.close(fig)
+measured_graph(
+    "retraction", "retract_pct", "mean_ns_per_step", "sd_ns_per_step",
+    "retraction chance (%)", "latency (ns per step)",
+    "Latency as retraction rate changes", "fig3_latency_retraction.png",
+)
 
-two_panel("exp1_window", "w", "window size w", "Experiment 1: window size (10%% retractions, N = %d)" % stream_size, "fig1_window.png")
-two_panel("exp2_retract", "retract_pct", "retraction chance per step (%)", "Experiment 2: retraction rate (w = 10^4)", "fig2_retract.png", logx=False)
-two_panel("exp3_domain", "range", "value range R (size of the compressed domain U is about R)", "Experiment 3: compressed domain (w = 100)", "fig3_domain.png")
+measured_graph(
+    "retraction", "retract_pct", "mean_memory_mb", "sd_memory_mb",
+    "retraction chance (%)", "extra peak resident memory (MB)",
+    "Memory as retraction rate changes", "fig4_memory_retraction.png",
+)
 
-fig, axs = plt.subplots(1, 2, figsize=(12, 4.2))
-for st in ["A", "B"]:
-    d = pick("exp1_window", st)
-    x = [r["w"] for r in d]
-    axs[0].plot(x, [r["pred_mem_mb"] for r in d], color=COL[st], linestyle="--", marker="s", label="predicted " + st)
-    axs[0].errorbar(x, [r["meas_mem_mb"] for r in d], yerr=[r["meas_mem_sd"] for r in d], color=COL[st], marker="o", capsize=3, label="measured " + st)
-    d = pick("exp3_domain", st)
-    x = [r["range"] for r in d]
-    axs[1].plot(x, [r["pred_mem_mb"] for r in d], color=COL[st], linestyle="--", marker="s", label="predicted " + st)
-    axs[1].errorbar(x, [r["meas_mem_mb"] for r in d], yerr=[r["meas_mem_sd"] for r in d], color=COL[st], marker="o", capsize=3, label="measured " + st)
-axs[0].set_xscale("log"); axs[1].set_xscale("log")
-axs[0].set_xlabel("window size w"); axs[1].set_xlabel("value range R (w = 100)")
-for ax in axs:
-    ax.set_ylabel("peak extra memory (MB)")
-    ax.set_ylim(bottom=0)
-    ax.grid(alpha=0.3)
-    ax.legend(fontsize=8)
-fig.suptitle("Peak memory above the input (N = %d)" % stream_size)
-fig.tight_layout()
-fig.savefig(os.path.join(outdir, "fig4_memory.png"), dpi=140)
-plt.close(fig)
+purge = select("purge", "A")
+figure, axes = plt.subplots(1, 2, figsize=(11, 4.3))
+axes[0].plot(
+    [row["theta"] for row in purge],
+    [row["purge_overhead"] for row in purge],
+    color=colors["A"], marker="o",
+)
+axes[0].set_xlabel("purge threshold theta")
+axes[0].set_ylabel("model overhead 1 + 1/theta")
+axes[0].set_title("Amortized purge model")
+axes[1].errorbar(
+    [row["theta"] for row in purge],
+    [row["mean_ns_per_step"] for row in purge],
+    yerr=[row["sd_ns_per_step"] for row in purge],
+    color=colors["A"], marker="o", capsize=4,
+)
+axes[1].set_xlabel("purge threshold theta")
+axes[1].set_ylabel("measured latency (ns per step)")
+axes[1].set_title("Measured Structure A cost")
+for axis in axes:
+    axis.set_ylim(bottom=0)
+    axis.grid(alpha=0.3)
+figure.suptitle("Structure A: effect of purge threshold")
+figure.tight_layout()
+figure.savefig(os.path.join(figures, "fig5_purge_threshold.png"), dpi=150)
+plt.close(figure)
 
-fig, axs = plt.subplots(1, 2, figsize=(12, 4.2))
-d = pick("exp4_purge", "A")
-x = [r["purge_factor"] for r in d]
-axs[0].errorbar(x, [r["meas_ns_mean"] for r in d], yerr=[r["meas_ns_sd"] for r in d], color="tab:blue", marker="o", capsize=3, label="measured (main run)")
-axs[0].set_xlabel("purge factor (purge when heap items > factor x live)")
-axs[0].set_ylabel("time per step (ns)")
-axs[0].set_ylim(bottom=0)
-axs[0].legend(fontsize=8)
-axs[0].grid(alpha=0.3)
-axs[1].plot(x, [r["pred_ops"] for r in d], color="tab:blue", linestyle="--", marker="s", label="predicted")
-axs[1].plot(x, [r["meas_ops"] for r in d], color="tab:blue", marker="o", label="measured")
-axs[1].set_xlabel("purge factor")
-axs[1].set_ylabel("counted operations per step")
-axs[1].set_ylim(bottom=0)
-axs[1].legend()
-axs[1].grid(alpha=0.3)
-fig.suptitle("Experiment 4: purge threshold of Structure A (w = 10^4, 10% retractions)")
-fig.tight_layout()
-fig.savefig(os.path.join(outdir, "fig5_purge.png"), dpi=140)
-plt.close(fig)
+domain = select("domain", "B")
+figure, axes = plt.subplots(1, 2, figsize=(11, 4.3))
+depth = [row["log_depth"] for row in domain]
+axes[0].plot(depth, [row["model_step_units"] for row in domain], "--s", label="3 log2(U+1) model")
+axes[0].plot(depth, [row["measured_operations_per_step"] for row in domain], "-o", label="measured counted operations")
+axes[0].set_xlabel("log2(U+1)")
+axes[0].set_ylabel("cost per step")
+axes[0].set_title("Logarithmic operation model")
+axes[0].legend()
+axes[1].errorbar(
+    depth,
+    [row["mean_ns_per_step"] for row in domain],
+    yerr=[row["sd_ns_per_step"] for row in domain],
+    color=colors["B"], marker="o", capsize=4,
+)
+axes[1].set_xlabel("log2(U+1)")
+axes[1].set_ylabel("measured latency (ns per step)")
+axes[1].set_title("Measured Structure B cost")
+for axis in axes:
+    axis.set_ylim(bottom=0)
+    axis.grid(alpha=0.3)
+figure.suptitle("Structure B: cost as compressed domain grows")
+figure.tight_layout()
+figure.savefig(os.path.join(figures, "fig6_fenwick_logU.png"), dpi=150)
+plt.close(figure)
 
-fig, ax = plt.subplots(figsize=(5.5, 5))
-for st in ["A", "B"]:
-    d = [r for r in rows if r["structure"] == st]
-    ax.scatter([r["pred_ops"] for r in d], [r["meas_ops"] for r in d], color=COL[st], label=NAME[st], s=22)
-ax.plot([0, 90], [0, 90], color="gray", linestyle=":")
-ax.set_xlabel("predicted counted operations per step")
-ax.set_ylabel("measured counted operations per step")
-ax.legend(fontsize=8)
-ax.grid(alpha=0.3)
-ax.set_title("Prediction against measurement (all settings)")
-fig.tight_layout()
-fig.savefig(os.path.join(outdir, "fig6_pred_vs_meas.png"), dpi=140)
-plt.close(fig)
-two_panel("exp5_percentile", "percentile", "percentile", "Experiment 5: requested percentile", "fig7_percentile.png", logx=False)
-print("figures written to", outdir)
+print("Wrote six graphs to", figures)
