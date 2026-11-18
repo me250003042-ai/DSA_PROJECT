@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include "Item.h"
@@ -9,7 +10,6 @@
 #include <stdexcept>
 #include <vector>
 #include <cmath>
-#include <stdexcept>
 
 class RunningMedian {
 private:
@@ -24,16 +24,16 @@ private:
     int deadItems;
 
     long long nextId;
-    double percentile;
+    double purgeFactor;
 
     int targetLow(double p) const {
-    int total = lowLive + highLive;
+        int total = lowLive + highLive;
 
-    if (total == 0)
-        return 0;
+        if (total == 0)
+            return 0;
 
-    return (int)ceil(p * total);
-}
+        return (int)ceil(p * total);
+    }
 
     bool markDead(long long id) {
         HashEntry* entry = table.find(id);
@@ -41,9 +41,12 @@ private:
         if (entry == nullptr || !entry->active)
             return false;
 
-        entry->active = false;
+        int side = entry->heapSide;
 
-        if (entry->heapSide == 0)
+        if (!table.erase(id))
+            return false;
+
+        if (side == 0)
             lowLive--;
         else
             highLive--;
@@ -61,7 +64,11 @@ private:
                 break;
 
             low.pop();
-            deadItems--;
+
+            if (entry != nullptr) {
+                table.remove(id);
+                deadItems--;
+            }
         }
     }
 
@@ -74,50 +81,65 @@ private:
                 break;
 
             high.pop();
-            deadItems--;
+
+            if (entry != nullptr) {
+                table.remove(id);
+                deadItems--;
+            }
         }
     }
 
-   void rebalance(double p) {
-    cleanLow();
-    cleanHigh();
+    void rebalance(double p) {
+        cleanLow();
+        cleanHigh();
 
-    int target = targetLow(p);
+        int target = targetLow(p);
 
-    while (lowLive > target) {
-        Item x = low.pop();
+        while (lowLive > target) {
+            cleanLow();
 
-        high.push(x);
-        table.find(x.id)->heapSide = 1;
+            if (low.empty())
+                break;
 
-        lowLive--;
-        highLive++;
+            Item x = low.pop();
+
+            high.push(x);
+
+            HashEntry* entry = table.find(x.id);
+            if (entry != nullptr)
+                entry->heapSide = 1;
+
+            lowLive--;
+            highLive++;
+        }
+
+        while (lowLive < target) {
+            cleanHigh();
+
+            if (high.empty())
+                break;
+
+            Item x = high.pop();
+
+            low.push(x);
+
+            HashEntry* entry = table.find(x.id);
+            if (entry != nullptr)
+                entry->heapSide = 0;
+
+            highLive--;
+            lowLive++;
+        }
 
         cleanLow();
-    }
-
-    while (lowLive < target) {
-        cleanHigh();
-
-        Item x = high.pop();
-
-        low.push(x);
-        table.find(x.id)->heapSide = 0;
-
-        highLive--;
-        lowLive++;
-
         cleanHigh();
     }
-
-    cleanLow();
-    cleanHigh();
-}
 
     void purgeIfNeeded() {
         int live = lowLive + highLive;
+        int total = low.size() + high.size();
 
-        if (deadItems <= live)
+        if (total <= purgeFactor * live)
             return;
 
         std::vector<Item> keepLow;
@@ -126,15 +148,21 @@ private:
         for (const Item& x : low.items()) {
             HashEntry* entry = table.find(x.id);
 
-            if (entry != nullptr && entry->active)
+            if (entry != nullptr && entry->active) {
                 keepLow.push_back(x);
+            } else if (entry != nullptr) {
+                table.remove(x.id);
+            }
         }
 
         for (const Item& x : high.items()) {
             HashEntry* entry = table.find(x.id);
 
-            if (entry != nullptr && entry->active)
+            if (entry != nullptr && entry->active) {
                 keepHigh.push_back(x);
+            } else if (entry != nullptr) {
+                table.remove(x.id);
+            }
         }
 
         low.build(keepLow);
@@ -144,31 +172,29 @@ private:
     }
 
     void finish() {
-    cleanLow();
-    cleanHigh();
+        cleanLow();
+        cleanHigh();
 
-    rebalance(0.5);
-    purgeIfNeeded();
+        rebalance(0.5);
+        purgeIfNeeded();
 
-    cleanLow();
-    cleanHigh();
-}
+        cleanLow();
+        cleanHigh();
+    }
 
 public:
-    RunningMedian(int w, double p = 0.5)
-        : windowQueue(w) {
-
-        if (w <= 0 || p <= 0.0 || p > 1.0)
-            throw std::invalid_argument("Invalid window or percentile");
+    RunningMedian(int w) : windowQueue(w) {
+        if (w <= 0)
+            throw std::invalid_argument("Invalid window size");
 
         windowSize = w;
-        percentile = p;
 
         lowLive = 0;
         highLive = 0;
         deadItems = 0;
 
-        nextId = 0;
+        nextId = 1;
+        purgeFactor = 2.0;
     }
 
     long long insert(double value) {
@@ -188,8 +214,7 @@ public:
             low.push(x);
             table.insert(id, 0);
             lowLive++;
-        }
-        else {
+        } else {
             high.push(x);
             table.insert(id, 1);
             highLive++;
@@ -212,28 +237,44 @@ public:
     }
 
     double findMedian() {
-    if (size() == 0)
-        throw std::runtime_error("No readings available");
+        if (size() == 0)
+            throw std::runtime_error("No readings available");
 
-    rebalance(0.5);
+        rebalance(0.5);
 
-    return low.top().value;
-}
+        if (size() % 2 == 0) {
+            return low.top().value / 2.0
+                 + high.top().value / 2.0;
+        }
 
-double findPercentile(double p) {
-    if (size() == 0)
-        throw std::runtime_error("No readings available");
+        return low.top().value;
+    }
 
-    if (p <= 0.0 || p > 1.0)
-        throw std::invalid_argument("Invalid percentile");
+    double findPercentile(double p) {
+        if (size() == 0)
+            throw std::runtime_error("No readings available");
 
-    rebalance(p);
+        if (p <= 0.0 || p > 1.0)
+            throw std::invalid_argument("Invalid percentile");
 
-    return low.top().value;
-}
+        rebalance(p);
+
+        return low.top().value;
+    }
+
+    void setPurgeFactor(double factor) {
+        if (factor <= 0.0)
+            throw std::invalid_argument("Invalid purge factor");
+
+        purgeFactor = factor;
+        purgeIfNeeded();
+    }
 
     int size() const {
         return lowLive + highLive;
     }
-};
 
+    int heapItems() const {
+        return low.size() + high.size();
+    }
+};
