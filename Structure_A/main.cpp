@@ -1,7 +1,6 @@
 
 #include <iostream>
 #include "./structureA.h"
-#include "Counters.h"
 
 using namespace std;
 
@@ -69,23 +68,6 @@ int main() {
                 else if (choice == 6) {
                     break;
                 }
-#ifdef COUNT_OPS
-                else if (choice == 7) {
-                    cout << "\nBenchmark Counters\n";
-
-                    cout << "Heap comparisons: "
-                         << g_heap_compares << '\n';
-
-                    cout << "Heap swaps: "
-                         << g_heap_swaps << '\n';
-
-                    cout << "Hash probes: "
-                         << g_hash_probes << '\n';
-
-                    cout << "Purge entries scanned: "
-                         << g_purge_moves << '\n';
-                }
-#endif
                 else {
                     cout << "Invalid choice\n";
                 }
