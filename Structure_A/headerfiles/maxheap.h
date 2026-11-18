@@ -2,7 +2,6 @@
 #pragma once
 
 #include "Item.h"
-#include "Counters.h"
 
 #include <vector>
 #include <stdexcept>
@@ -13,8 +12,6 @@ private:
     std::vector<Item> data;
 
     bool greaterItem(const Item& a, const Item& b) const {
-        COUNT(g_heap_compares);
-
         if (a.value != b.value)
             return a.value > b.value;
 
@@ -28,7 +25,6 @@ private:
             if (!greaterItem(data[i], data[parent]))
                 break;
 
-            COUNT(g_heap_swaps);
             std::swap(data[i], data[parent]);
 
             i = parent;
@@ -52,7 +48,6 @@ private:
             if (largest == i)
                 break;
 
-            COUNT(g_heap_swaps);
             std::swap(data[i], data[largest]);
 
             i = largest;
