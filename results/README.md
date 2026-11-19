@@ -1,96 +1,84 @@
-# Graph analysis and conclusions
+# Team implementation benchmark results
 
-This analysis uses the current comparison.csv: 1,000,000 replay steps per run and five timing seeds per setting. A step adds one double reading, optionally retracts an ID, then requests the median. Blue represents A (two heaps); red represents B (Fenwick tree). Error bars show one sample standard deviation across the five runs, not confidence intervals. Lower latency and lower memory are better.
+One million steps per run, five timing seeds, 31 settings across four experiment families. Each step adds a double, optionally retracts an ID, and requests the median. Operation counting has been removed.
 
-Construction and B's coordinate compression are measured separately and excluded from the plotted replay latency. Memory means extra peak process working set relative to a pre-construction baseline, converted to decimal MB. It includes implementation bookkeeping and is an approximate process metric, not isolated data-structure allocation size.
+Source: GitHub main commit 54ed2b5. A uses the team RunningMedian implementation with integration fixes. B uses the latest team value/active-pair storage, hash compression and two-search median implementation with ID and expiry corrections. See ../bench/TEAM_INTEGRATION.md. These are corrected integration copies, not unmodified upstream files.
 
-## 1. Latency versus window size
+Latency excludes input generation and construction. Memory is approximate extra peak process working set, not exact allocations. Error bars are sample standard deviations over five seeds.
 
-![Latency versus window size](figures/fig1_latency_window.png)
+## Window size
 
-The horizontal axis is window size w on a logarithmic scale. The vertical axis is mean nanoseconds per replay step. Retraction probability is 10%, value range is 1,000,000 and purge factor is 2.
+![Window size](figures/fig1_latency_window.png)
+![Window size](figures/fig2_memory_window.png)
 
-| Window | A latency (ns) | B latency (ns) | B/A speedup ratio |
-|---:|---:|---:|---:|
-| 100 | 794.28 | 1237.49 | 1.558 |
-| 1,000 | 744.69 | 686.47 | 0.922 |
-| 10,000 | 443.26 | 486.74 | 1.098 |
-| 100,000 | 438.74 | 469.02 | 1.069 |
+| Structure | Setting | Mean ns/step | SD ns | Memory MB |
+|---|---:|---:|---:|---:|
+| A | 100 | 731.27 | 53.29 | 6.518 |
+| B | 100 | 1907.3 | 323.82 | 52.22 |
+| A | 1000 | 1233.0 | 96.42 | 6.541 |
+| B | 1000 | 2184.49 | 290.16 | 52.222 |
+| A | 10000 | 4265.03 | 95.65 | 7.288 |
+| B | 10000 | 2618.73 | 53.58 | 52.204 |
+| A | 100000 | 21931.76 | 5319.09 | 30.247 |
+| B | 100000 | 1695.18 | 74.29 | 52.195 |
 
-A is faster in three of four measured settings; B is faster at w=1,000. Several differences are small relative to run-to-run spread. Both curves unexpectedly decrease as the window grows. This does not demonstrate that larger windows intrinsically make the algorithms faster: sequential execution, changing machine load or other runtime effects may influence these measurements. Their causes were not measured.
+Window graphs vary w while holding the generated domain and retraction probability fixed. A heap occupancy depends on w. B domain storage depends on U. Timing can also reflect cache, allocation and machine-load effects; a finite sweep does not prove an asymptotic bound.
 
-The operation counters provide a clearer complexity trend: A rises from 32.891 to 59.266 selected events per step, while B remains around 79. B's U stays about 632,316, so its logarithmic domain cost changes little with w. Conclusion: this timing sweep alone does not verify A's logarithmic growth; it should not be used to claim decreasing asymptotic cost.
+## Retraction probability
 
-## 2. Memory versus window size
+![Retraction probability](figures/fig3_latency_retraction.png)
+![Retraction probability](figures/fig4_memory_retraction.png)
 
-![Memory versus window size](figures/fig2_memory_window.png)
+| Structure | Setting | Mean ns/step | SD ns | Memory MB |
+|---|---:|---:|---:|---:|
+| A | 0 | 633.89 | 29.91 | 7.267 |
+| B | 0 | 1761.16 | 57.26 | 52.192 |
+| A | 10 | 3718.99 | 24.01 | 7.301 |
+| B | 10 | 1785.95 | 89.46 | 52.191 |
+| A | 30 | 10265.87 | 158.64 | 7.135 |
+| B | 30 | 1755.51 | 77.16 | 52.201 |
+| A | 50 | 17229.04 | 224.94 | 7.003 |
+| B | 50 | 1729.34 | 42.96 | 52.188 |
+| A | 70 | 24894.6 | 201.41 | 6.993 |
+| B | 70 | 1741.08 | 72.47 | 52.193 |
+| A | 90 | 33180.76 | 317.6 | 6.926 |
+| B | 90 | 1638.91 | 79.2 | 52.199 |
 
-This uses the same settings as graph 1. A's measured extra peak resident memory rises from 6.196 MB at w=100 to 13.731 MB at w=100,000. B stays approximately constant at 19.62-19.65 MB because its compressed universe and stream length are nearly fixed.
+The x-axis is retraction request probability, not successful deletion fraction. A successful retraction may replace a later expiry removal. Do not assume runtime must grow linearly with request probability.
 
-A uses less measured memory throughout this sweep. The growing heap allowance explains the direction of A's trend, while B's domain arrays depend primarily on U. Neither implementation uses only window-sized storage: retained per-arrival metadata contributes O(N). These process measurements are consistent with O(N+w) for A and O(N+U) for B, but measurements at fixed N cannot prove those bounds.
+## A purge threshold
 
-## 3. Latency versus retraction probability
+![A purge threshold](figures/fig5_purge_threshold.png)
 
-![Latency versus retraction probability](figures/fig3_latency_retraction.png)
+| Structure | Setting | Mean ns/step | SD ns | Memory MB |
+|---|---:|---:|---:|---:|
+| A | 1.25 | 5885.0 | 26.46 | 7.08 |
+| A | 1.5 | 5154.42 | 75.49 | 7.051 |
+| A | 2.0 | 3681.89 | 61.79 | 7.301 |
+| A | 3.0 | 1870.49 | 23.0 | 7.318 |
+| A | 4.0 | 1253.43 | 36.33 | 7.505 |
+| A | 6.0 | 734.38 | 15.51 | 7.833 |
 
-The horizontal axis is the probability of requesting a retraction, not the fraction of requests that successfully remove a live reading. Window size is 10,000, range is 1,000,000 and purge factor is 2.
+Lowest mean latency in this sweep: purge factor 6.0 (alpha=5.0), 734.38 ns/step. Larger alpha permits more dead entries and lowers the rebuild-overhead reference 1+1/alpha. Actual latency also includes hash-table maintenance, including rehashing, so the reference is not a complete runtime model.
 
-A increases from 409.02 ns at 0% to 484.29 ns at 90%; B increases from 447.90 to 483.32 ns. Intermediate points are not monotonic. At 90%, their means differ by only 0.97 ns, well within the observed variation. A's B/A ratio falls from 1.095 at 0% to 0.998 at 90%, so its initial advantage disappears in this sweep.
+## B compressed universe
 
-A's selected operation count rises from 48.251 to 67.802 events per step. B's stays near 79.6. B already performs expiry removals in steady state; a successful explicit retraction can replace a later expiry removal, so a higher request rate need not proportionally increase total tree work. Conclusion: A becomes more expensive under heavier retraction traffic in aggregate, while B's counted workload is relatively stable. The measurements do not establish a universal winner.
+![B compressed universe](figures/fig6_fenwick_logU.png)
 
-## 4. Memory versus retraction probability
+| Structure | Setting | Mean ns/step | SD ns | Memory MB |
+|---|---:|---:|---:|---:|
+| B | 100 | 266.08 | 5.9 | 16.859 |
+| B | 1000 | 300.51 | 7.26 | 16.908 |
+| B | 10000 | 363.33 | 15.53 | 17.691 |
+| B | 99995 | 518.85 | 29.86 | 22.286 |
+| B | 632248 | 1208.71 | 38.26 | 52.199 |
 
-![Memory versus retraction probability](figures/fig4_memory_retraction.png)
+The left panel shows a dimensionless logarithmic reference, not counted operations. The right panel shows measured latency against log2(U+1). U is averaged across timing seeds. Larger U changes both tree traversal depth and hash/domain memory.
 
-A decreases from 7.463 MB at 0% to 7.065 MB at 90%, approximately a 5.3% reduction. B remains around 19.61-19.65 MB. More retractions can reduce live heap occupancy in A, while B retains its compressed values and frequency array even when fewer readings are live.
+## Conclusions
 
-Conclusion: A is more memory-efficient for these fixed-large-domain workloads. Retractions do not substantially shrink B's allocated domain storage. The modest change in A's process memory should not be interpreted as an exact count of reclaimed heap entries.
+A has lower mean latency in 3 of 10 paired settings. This is a comparison of means, not a statistical significance test.
 
-## 5. Structure A purge threshold
+Choose based on the actual workload and domain size. Inspect the memory and timing tables together. The purge setting trades retained heap entries against rebuilding work. B needs a known finite domain. These results replace the earlier local-implementation measurements.
 
-![Structure A purge threshold](figures/fig5_purge_threshold.png)
-
-The left panel plots the model 1+1/theta; the right panel plots measured latency. Here theta=purge_factor-1. Increasing theta allows more dead entries before rebuilding.
-
-| theta | Model overhead | Purge scans per step | Latency (ns) | Memory (MB) |
-|---:|---:|---:|---:|---:|
-| 0.25 | 5.000 | 4.925 | 493.86 | 7.157 |
-| 0.5 | 3.000 | 2.941 | 456.98 | 7.242 |
-| 1 | 2.000 | 1.960 | 425.65 | 7.419 |
-| 2 | 1.500 | 1.457 | 416.74 | 7.838 |
-| 3 | 1.333 | 1.295 | 367.87 | 8.028 |
-| 5 | 1.200 | 1.142 | 384.21 | 8.700 |
-
-The counted purge scans closely follow the decreasing amortized model. Latency generally improves, but rises again at theta=5. Memory increases as more dead entries are permitted. The best observed latency is theta=3 (purge factor 4), not the largest tested threshold.
-
-Conclusion: purge threshold creates a time-memory tradeoff. A loose threshold reduces rebuild work but can increase heap/storage costs. This experiment supports the amortized purge model, while showing that it does not capture every component of runtime. Theta=3 is the best measured choice for this workload only.
-
-## 6. Structure B cost versus compressed universe
-
-![Structure B logarithmic domain cost](figures/fig6_fenwick_logU.png)
-
-Both panels use log2(U+1) on the horizontal axis. The left compares the simple 3*log2(U+1) reference with counted Fenwick/binary-lifting events; the right shows latency. Window size is fixed at 100.
-
-| Actual U (counted seed) | Counted events per step | Latency (ns) | Memory (MB) |
-|---:|---:|---:|---:|
-| 100 | 28.255 | 135.65 | 9.093 |
-| 1,000 | 40.093 | 180.81 | 9.517 |
-| 10,000 | 55.699 | 240.40 | 9.549 |
-| 99,995 | 68.250 | 311.10 | 11.109 |
-| 632,316 | 79.720 | 510.99 | 19.626 |
-
-Counted work grows approximately with log U, supporting the Fenwick update/rank-search complexity. The measured count is above the reference curve because the coefficient 3 is an illustrative trend score; a replay step can involve expiry, retraction and two middle-rank searches. It is not an exact event-count prediction.
-
-Latency and memory both increase as the universe grows. The largest-domain latency increase is stronger than the counter increase; cache or memory-access effects are plausible explanations, but were not profiled here. Conclusion: B is particularly efficient with a small known domain; large U increases both its work and storage.
-
-## Overall conclusions
-
-1. A uses less measured resident memory in every paired setting here. B retains storage for the full known compressed universe.
-2. A has lower mean replay latency in most paired settings, but some differences are small compared with variability. There is no universal timing winner.
-3. Heavy retraction traffic removes A's timing advantage in the measured retraction sweep; at 90% the means are effectively tied at this measurement resolution.
-4. A's purge experiment supports the predicted amortized rebuild tradeoff. Larger thresholds reduce purge work but increase memory; the fastest tested setting is purge factor 4.
-5. B's counted work follows the expected logarithmic dependence on U. Its small-domain run reaches about 7.37 million steps/second, while its largest-domain run reaches about 1.96 million.
-6. The window timing sweep contains substantial order/runtime variation and cannot by itself confirm the theoretical latency trend. Randomizing experiment order and repeating the sweep would strengthen that comparison.
-
-These conclusions apply to this implementation, machine and generated workload. Construction costs, correctness testing and resident-memory limitations must be considered alongside replay latency. Formula derivations are in [bench/FORMULAS.md](../bench/FORMULAS.md); raw runs are in [timing.csv](timing.csv), instrumented measurements in [counts.csv](counts.csv), and graph inputs in [comparison.csv](comparison.csv).
+Raw data: timing.csv. Aggregated measurements: comparison.csv. Mathematical references: predictions.csv. Definitions and derivations: ../bench/FORMULAS.md.

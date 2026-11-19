@@ -1,5 +1,9 @@
 # CS 253 / MA 253 Lab Project 8: Running Median with Retractions
 
+## Integrated Windows benchmark
+
+Run `python bench/run_bench.py` from the repository root. Requires g++ C++17, Python and matplotlib. The corrected team implementation copies used by the benchmark are under `src/`; original team sources remain under `Structure_A/` and `Structure_B/`. See [integration changes](bench/TEAM_INTEGRATION.md), [benchmark instructions](bench/README.md), and [current results](results/README.md). Operation counting has been removed. Run `powershell -NoProfile -ExecutionPolicy Bypass -File run_all.ps1 -Quick` for builds, differential checks and demos without replacing saved results.
+
   Project Overview
 This project implements and evaluates a high-throughput stream monitoring service that reports the running median (and general $p$-th percentiles) over a sliding window of the most recent $w$ readings (up to $w = 10^5$) across a stream of $N = 10^6$ operations, supporting arbitrary out-of-order retractions of faulty readings.
 

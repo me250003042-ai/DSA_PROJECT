@@ -21,14 +21,23 @@ def setting(row):
 
 
 timing = read("timing.csv")
-counts = read("counts.csv")
 predictions = read("predictions.csv")
+
+paired_runs = {}
+for row in timing:
+    key = (row['experiment'], row['w'], row['retract_pct'], row['range'], row['seed'], row['purge_factor'])
+    paired_runs.setdefault(key, {})[row['structure']] = row
+for key, pair in paired_runs.items():
+    if 'A' in pair and 'B' in pair:
+        for field in ['checksum', 'retractions_done']:
+            if pair['A'][field] != pair['B'][field]:
+                raise ValueError(f'A/B {field} mismatch for {key}')
+print('Matching A/B checksums and successful retractions verified')
 
 groups = {}
 for row in timing:
     groups.setdefault(setting(row), []).append(row)
 
-count_by_setting = {setting(row): row for row in counts}
 rows = []
 
 for prediction in predictions:
@@ -36,12 +45,9 @@ for prediction in predictions:
     runs = groups[key]
     ns = [float(row["ns_per_step"]) for row in runs]
     memory = [float(row["peak_kb"]) * 1024 / 1e6 for row in runs]
-    count = count_by_setting[key]
-    names = ["heap_compares", "heap_swaps", "hash_probes", "purge_moves", "fen_steps", "bin_steps"]
-    measured_operations = sum(float(count[name] or 0) for name in names)
     mean_ns = mean(ns)
 
-    universe = int(count["distinct_values"]) if key[1] == "B" else key[2]
+    universe = round(mean(int(row["distinct_values"]) for row in runs)) if key[1] == "B" else key[2]
     depth = math.log2(universe + 1)
     model_units = 3.0 * depth if key[1] == "B" else float(prediction["model_step_units"])
 
@@ -63,8 +69,6 @@ for prediction in predictions:
         "throughput_steps_per_sec": round(1e9 / mean_ns, 2),
         "mean_memory_mb": round(mean(memory), 3),
         "sd_memory_mb": round(stdev(memory), 3),
-        "measured_operations_per_step": round(measured_operations, 3),
-        "measured_purge_moves_per_step": count["purge_moves"],
         "speedup_A_over_B": "",
     })
 

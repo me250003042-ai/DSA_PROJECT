@@ -115,10 +115,9 @@ domain = select("domain", "B")
 figure, axes = plt.subplots(1, 2, figsize=(11, 4.3))
 depth = [row["log_depth"] for row in domain]
 axes[0].plot(depth, [row["model_step_units"] for row in domain], "--s", label="3 log2(U+1) model")
-axes[0].plot(depth, [row["measured_operations_per_step"] for row in domain], "-o", label="measured counted operations")
 axes[0].set_xlabel("log2(U+1)")
 axes[0].set_ylabel("cost per step")
-axes[0].set_title("Logarithmic operation model")
+axes[0].set_title("Logarithmic trend reference")
 axes[0].legend()
 axes[1].errorbar(
     depth,
