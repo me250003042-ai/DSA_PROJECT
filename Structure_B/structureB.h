@@ -42,7 +42,7 @@ class StructureB{
     vector<double> all;
     unordered_map<double,int> h;
     vector<pair<double,bool>> arr;
-    int start = -1;
+    int start = 0;
     int size = 0;
     
 public:
