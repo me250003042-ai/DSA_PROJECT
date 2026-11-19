@@ -61,7 +61,7 @@ public:
         ft = FenTree(all.size());
     }
 
-    int add(double x){
+    ll add(double x){
         if(h.find(x) == h.end()){
             throw invalid_argument("This element does not exists in the domain");
         }
@@ -82,13 +82,17 @@ public:
             ft.add(idx , 1);
         }
 
-        int id = arr.size() - 1;
+        ll id = arr.size() - 1;
         return id;
     }
 
-    void retract(int id){
+    bool retract(ll id){
         if(id < 0 || id >= arr.size()){
             throw invalid_argument("This id is not in the domain");
+            return false;
+        }
+        if(!arr[id].second){
+            return true;
         }
         int idx = 1 + h[arr[id].first];
         arr[id].second = false;
@@ -97,6 +101,7 @@ public:
             start++;
         }
         ft.add(idx , -1);
+        return true;
     }
 
     double get(){
@@ -134,7 +139,7 @@ public:
         i = log2(ft.n);
         j = 0;
         sum = 0;
-        target = size - size/2 + 1; // this i have set for lower median
+        target = size - size/2 + 1; // this i have set for upper median
         ans = 0;
         while(i>=0){
             j += (1<<i);
@@ -153,8 +158,6 @@ public:
             i--;
         }
         double upper = all[ans - 1];
-        cout<<size<<endl;
-        cout<<upper<<' '<<lower<<endl;
         double avg = lower + (upper - lower)/2;
         return avg;
     }
