@@ -89,7 +89,6 @@ public:
     bool retract(ll id){
         if(id < 0 || id >= arr.size()){
             throw invalid_argument("This id is not in the domain");
-            return false;
         }
         if(!arr[id].second){
             return true;
