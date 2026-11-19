@@ -1,0 +1,7 @@
+build/
+bench/bench_time
+bench/bench_count
+__pycache__/
+*.pyc
+*.exe
+.tmp_pdf_reader/

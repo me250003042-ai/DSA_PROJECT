@@ -6,8 +6,8 @@
 #include <random>
 #include <cstdlib>
 #include <cmath>
-#include "../Structure_A/structureA.h"
-#include "../Structure_B/structureB.h"
+#include "../src/structA/medianA.h"
+#include "../src/structB/medianB.h"
 using namespace std;
 
 double memoryKb(bool peak) {
@@ -113,11 +113,6 @@ int main(int argc, char **argv) {
          << seed << "," << purgeFactor << ","
          << buildMs << "," << runMs << "," << (runMs * 1e6 / n) << ","
          << (peakKb - baseKb) << "," << checksum << "," << retractDone << "," << distinctValues;
-#ifdef COUNT_OPS
-    cout << "," << g_heap_compares / (double)n << "," << g_heap_swaps / (double)n
-         << "," << g_hash_probes / (double)n << "," << g_purge_moves / (double)n
-         << "," << g_fen_steps / (double)n << "," << g_bin_steps / (double)n;
-#endif
     cout << "\n";
     delete a;
     delete b;
