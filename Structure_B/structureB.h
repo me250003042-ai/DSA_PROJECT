@@ -37,68 +37,66 @@ public:
 };
 
 class StructureB{
-    int win_size;
-    int p;
-    vector<double> arr;
-    unordered_map<double,int> h;
-    vector<pair<double,int>> all;
-    int start = 0;
     FenTree ft;
+    int win_size;
+    vector<double> all;
+    unordered_map<double,int> h;
+    vector<pair<double,bool>> arr;
+    int start = -1;
     int size = 0;
     
 public:
-    StructureB (int w, int n, vector<double> a){
+    StructureB (int w, vector<double> a){
         if(w <= 0){
             throw invalid_argument("Invalid window size");
         }
         this->win_size = w;
-        this->p = n;
         sort(a.begin(),a.end());
         a.erase(unique(a.begin(), a.end()), a.end()); // to remove the duplicates from the array
 
         for(int i = 0;i<a.size();i++){
-            all.push_back({a[i],0});
+            all.push_back(a[i]);
             h[a[i]] = i;
         }
         ft = FenTree(all.size());
     }
 
-    void add(double x){
+    int add(double x){
         if(h.find(x) == h.end()){
             throw invalid_argument("This element does not exists in the domain");
         }
         size++;
-        arr.push_back(x);
+        arr.push_back({x,true});
         if(size > win_size){
-            int left = 1 + h[arr[start]];
-            int right = 1 + h[arr.back()];
+            int left = 1 + h[arr[start].first];
+            int right = 1 + h[arr.back().first];
             ft.add(left , -1);
             ft.add(right , 1);
             start++;
-            while(all[h[arr[start]]].second > 0){
+            while(!arr[start].second){
                 start++;
-                all[h[arr[start]]].second--;
             }
             size--;
         }else{
-            int idx = 1 + h[arr.back()];
+            int idx = 1 + h[arr.back().first];
             ft.add(idx , 1);
         }
+
+        int id = arr.size() - 1;
+        return id;
     }
 
-    void retract(double x){
-        if(h.find(x) == h.end()){
-            throw invalid_argument("This element does not exists in the domain");
+    void retract(int id){
+        if(id < 0 || id >= arr.size()){
+            throw invalid_argument("This id is not in the domain");
         }
-        int idx = 1 + h[x];
-        int val = ft.sum(idx) - (idx > 1 ? ft.sum(idx - 1) : 0);
-        all[h[x]].second += val;
-        size -= val;
-        while(all[h[arr[start]]].second > 0){
+        int idx = 1 + h[arr[id].first];
+        arr[id].second = false;
+        size --;
+        while(!arr[start].second){
             start++;
-            all[h[arr[start]]].second--;
         }
-        ft.add(idx , -val);
+        ft.add(idx , -1);
     }
 
     double get(){
@@ -128,9 +126,36 @@ public:
             }
             i--;
         }
-        if(sum < target){
-            return all[ans-1].first;
+        double lower = all[ans - 1];
+        if(size %  2){
+            return lower;
         }
-        return all[j-1].first;
+
+        i = log2(ft.n);
+        j = 0;
+        sum = 0;
+        target = size - size/2 + 1; // this i have set for lower median
+        ans = 0;
+        while(i>=0){
+            j += (1<<i);
+            if(j > ft.n){
+                j -= (1<<i);
+                i--;
+                continue;
+            }
+            sum += ft.bit[j];
+
+            if(sum >= target){
+                ans = j;
+                sum -= (ft.bit[j]);
+                j -= (1<<i);
+            }
+            i--;
+        }
+        double upper = all[ans - 1];
+        cout<<size<<endl;
+        cout<<upper<<' '<<lower<<endl;
+        double avg = lower + (upper - lower)/2;
+        return avg;
     }
 };

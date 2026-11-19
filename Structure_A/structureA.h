@@ -200,7 +200,7 @@ public:
         purgeFactor = 2.0;
     }
 
-    long long insert(double value) {
+    long long add(double value) {
         if (windowQueue.full()) {
             long long oldId = windowQueue.pop();
             markDead(oldId);
@@ -243,7 +243,7 @@ public:
         return true;
     }
 
-    double findMedian() {
+    double get() {
         if (size() == 0)
             throw std::runtime_error("No readings available");
 

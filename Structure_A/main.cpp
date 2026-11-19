@@ -33,7 +33,7 @@ int main() {
                     cin >> value;
 
                     cout << "Generated ID: "
-                         << rm.insert(value) << '\n';
+                         << rm.add(value) << '\n';
                 }
                 else if (choice == 2) {
                     long long id;
@@ -50,7 +50,7 @@ int main() {
                         cout << "No readings available\n";
                     else
                         cout << "Median: "
-                             << rm.findMedian() << '\n';
+                             << rm.get() << '\n';
                 }
                 else if (choice == 4) {
                     double p;
