@@ -1,11 +1,11 @@
 
 #pragma once
 
-#include "Item.h"
-#include "MaxHeap.h"
-#include "MinHeap.h"
-#include "HashTable.h"
-#include "ExpiryQueue.h"
+#include "./headerfiles/item.h"
+#include "./headerfiles/maxheap.h"
+#include "./headerfiles/minheap.h"
+#include "./headerfiles/hashtable.h"
+#include "./headerfiles/expiryqueue.h"
 
 #include <stdexcept>
 #include <vector>

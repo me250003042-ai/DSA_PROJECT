@@ -1,6 +1,6 @@
 
 #include <iostream>
-#include "oracle.h"
+#include "./oracle.h"
 
 int main() {
 

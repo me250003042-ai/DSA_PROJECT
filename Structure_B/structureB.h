@@ -160,4 +160,73 @@ public:
         double avg = lower + (upper - lower)/2;
         return avg;
     }
+    double get_percentile(double p){
+        if(size == 0){
+            throw invalid_argument("No elements present");
+        }
+        if(p <= 0.0){
+            p = 0.0;
+        }
+        if(p >= 100.0){
+            p = 100.0;
+        }
+
+        double pos = 1.0 + (p / 100.0) * (size - 1);
+        int lo = (int)floor(pos);
+        int hi = (int)ceil(pos);
+        if(lo < 1) lo = 1;
+        if(hi > size) hi = size;
+
+        int i = log2(ft.n);
+        int j = 0;
+        int sum = 0;
+        int target = lo;
+        int ans = 0;
+        while(i>=0){
+            j += (1<<i);
+            if(j > ft.n){
+                j -= (1<<i);
+                i--;
+                continue;
+            }
+            sum += ft.bit[j];
+
+            if(sum >= target){
+                ans = j;
+                sum -= (ft.bit[j]);
+                j -= (1<<i);
+            }
+            i--;
+        }
+        double lower = all[ans - 1];
+        if(lo == hi){
+            return lower;
+        }
+
+        i = log2(ft.n);
+        j = 0;
+        sum = 0;
+        target = hi;
+        ans = 0;
+        while(i>=0){
+            j += (1<<i);
+            if(j > ft.n){
+                j -= (1<<i);
+                i--;
+                continue;
+            }
+            sum += ft.bit[j];
+
+            if(sum >= target){
+                ans = j;
+                sum -= (ft.bit[j]);
+                j -= (1<<i);
+            }
+            i--;
+        }
+        double upper = all[ans - 1];
+        double frac = pos - lo;
+        return lower + frac * (upper - lower);
+    }
+
 };
