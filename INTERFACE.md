@@ -1,16 +1,61 @@
-# Common median interface
+\# Common Median Interface
 
-Constructors: StructureA(w), StructureB(w, allValues), Oracle(w).
 
-- add(double) returns the next 1-based ID.
-- retract(id) removes exactly one active reading and returns success. Invalid, expired or repeated IDs return false.
-- get() returns NAN when empty, the middle value for odd live count, and the average of the middle values for even count.
-- A also provides setPurgeFactor(f), with finite f>1.
 
-Window means last w arrivals, regardless of explicit retractions. Values are double. B needs the complete finite input domain before construction and rejects unknown values.
+The application uses a common interface, `IOrderStatistic`, to run Structure A and Structure B through the same operations.
 
-A's adapter wraps team RunningMedian. Its lower max-heap and upper min-heap partition live values, with ceil(L/2) live entries in the lower heap. Heap roots are pruned before use. Hash entries track active state and heap side. Circular expiry queue tracks arrivals. Purge filters dead entries and rebuilds both heaps when H>f*L. Rehashing maintains the team's open-addressed table.
 
-B stores compressed indices in an unordered_map, frequencies in a Fenwick tree, and value/active pairs indexed by native reading ID. Its adapter translates native 0-based IDs to common 1-based IDs. Expiry/retraction decrements each reading at most once. Fenwick total equals live count. selfCheck() validates counts independently for differential testing. The corrected team get() uses separate binary-lifting searches for the middle ranks when the live count is even.
 
-The oracle keeps a sorted vector of live values. No operation counters are used in the integrated benchmark.
+\## Interface Operations
+
+
+
+\- `add(double value)` inserts a reading and returns its 1-based ID.
+
+\- `retract(int id)` removes an active reading and returns `true` on success, otherwise `false`.
+
+\- `getMedian()` returns the current median. For an empty window, it returns `NAN`.
+
+\- `getSize()` returns the number of active readings.
+
+
+
+\## Adapters
+
+
+
+\- `StructureAAdapter` connects `IOrderStatistic` to Structure A (two heaps).
+
+\- `StructureBAdapter` connects `IOrderStatistic` to Structure B (Fenwick tree).
+
+
+
+Both adapters provide the same operations and use common 1-based reading IDs.
+
+
+
+Structure A handles window expiry internally. Structure B also handles expiry internally; its adapter tracks active IDs and arrival order to provide the common interface.
+
+
+
+\## Window and Input Rules
+
+
+
+\- The window contains the last `w` arrivals, regardless of explicit retractions.
+
+\- Values are stored as `double`.
+
+\- Structure B requires the complete finite input domain (`allValues`) at construction and rejects values outside that domain.
+
+
+
+\## Application
+
+
+
+`app/monitor.cpp` uses the common interface to process sensor readings, retract faulty readings, compare active sizes and medians, and raise threshold alerts.
+
+
+
+The application checks that both implementations produce matching IDs, retraction results, active sizes, and medians.
