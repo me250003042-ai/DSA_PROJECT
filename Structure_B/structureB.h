@@ -72,7 +72,7 @@ public:
             int right = 1 + h[arr.back().first];
             ft.add(left , -1);
             ft.add(right , 1);
-            start++;
+            arr[start].second = false;
             while(!arr[start].second){
                 start++;
             }
@@ -87,7 +87,7 @@ public:
     }
 
     bool retract(ll id){
-        if(id < 0 || id >= arr.size()){
+        if(id < start || id >= arr.size()){
             throw invalid_argument("This id is not in the domain");
         }
         if(!arr[id].second){
@@ -96,7 +96,7 @@ public:
         int idx = 1 + h[arr[id].first];
         arr[id].second = false;
         size --;
-        while(!arr[start].second){
+        while(start < arr.size() && !arr[start].second){
             start++;
         }
         ft.add(idx , -1);
