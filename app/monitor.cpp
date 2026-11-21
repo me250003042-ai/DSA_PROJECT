@@ -27,7 +27,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    // Generate sensor readings.
     mt19937 rng(seed);
     vector<double> reading(n);
     vector<char> faulty(n);
@@ -48,11 +47,9 @@ int main(int argc, char **argv) {
         }
     }
 
-    // Create both implementations through their adapters.
     StructureAAdapter adapterA(window);
     StructureBAdapter adapterB(window, reading);
 
-    // Common interface references.
     IOrderStatistic &A = adapterA;
     IOrderStatistic &B = adapterB;
 
@@ -63,7 +60,6 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < n; i++) {
 
-        // Insert the same reading into both structures.
         int idA = A.add(reading[i]);
         int idB = B.add(reading[i]);
 
@@ -72,7 +68,6 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        // Retract the previous faulty reading.
         if (lastFaultyId > 0) {
             bool resultA = A.retract(lastFaultyId);
             bool resultB = B.retract(lastFaultyId);
@@ -91,13 +86,11 @@ int main(int argc, char **argv) {
         if (faulty[i])
             lastFaultyId = idA;
 
-        // Compare active reading counts.
         if (A.getSize() != B.getSize()) {
             cout << "ERROR: Active sizes differ at step " << i << "\n";
             return 1;
         }
 
-        // Compare medians.
         double medianA = A.getMedian();
         double medianB = B.getMedian();
 
@@ -109,7 +102,6 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        // Raise an alert when the median crosses the threshold.
         if (medianA > threshold && !inAlert) {
             inAlert = true;
             alerts++;
