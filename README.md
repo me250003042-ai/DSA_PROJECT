@@ -1,5 +1,16 @@
 # CS 253 / MA 253 Lab Project 8: Running Median with Retractions
 
+## Team and roles
+
+| Name | GitHub | Role | Module folder | Derivation |
+|---|---|---|---|---|
+| Yata Naresh |  | Structure A owner | `src/structA/` | D1 |
+| Atharv Vyas |  | Structure B owner | `src/structB/` | D2 |
+| Rajewar Shivram |  | Architect | `app/` | D3 |
+| Abhishek Singh |  | Oracle owner | `oracle/` | D4 |
+| Stavan Ingaldar |  | Adversary | `adversary/` | D5 |
+| Om Sunil Jain | `@me250003042-ai` | Analyst | `bench/` | D6 |
+
 ## Integrated Windows benchmark
 
 Run `python bench/run_bench.py` from the repository root. Requires g++ C++17, Python and matplotlib. The corrected team implementation copies used by the benchmark are under `src/`; original team sources remain under `Structure_A/` and `Structure_B/`. See [integration changes](bench/TEAM_INTEGRATION.md), [benchmark instructions](bench/README.md), and [current results](results/README.md). Operation counting has been removed. Run `powershell -NoProfile -ExecutionPolicy Bypass -File run_all.ps1 -Quick` for builds, differential checks and demos without replacing saved results.
